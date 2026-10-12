@@ -6,6 +6,8 @@ Antes de analizar, modificar archivos o generar contenido, revisa las instruccio
 - Skills del proyecto en `./.agents/skills`, si existe.
 - Memoria del proyecto en `./memory-bank`, si existe.
 
+En `memory-bank/`, consulta la nota pertinente antes de trabajar: `product.md` resume el producto y sus límites; `techContext.md` describe stack, estructura y comunicación; `progress.md` registra el estado comprobado y los próximos pasos.
+
 Revisa los archivos actuales antes de editarlos. No supongas que una ruta opcional existe ni la crees salvo que la tarea lo pida.
 
 - Antes de analizar o modificar archivos de `frontend/`, lee `./.agents/rules/frontend.md`.
@@ -55,6 +57,7 @@ En `backend/`, `pytest` ejecuta las pruebas declaradas en `tests/`; las dependen
 - Para cambios de cálculo, añade o actualiza pruebas enfocadas en `financial-utils.test.ts` o `backend/tests/test_routes.py`, según corresponda.
 - Confirma la intención funcional antes de conectar o eliminar rutas analíticas: la pantalla principal consume `/api/metrics`, mientras el backend declara otras rutas.
 - Mantén los cambios acotados y no presentes recomendaciones de `engineering-findings.md` como reglas ya formalizadas sin verificarlas.
+- Después de cada nueva implementación, actualiza la nota pertinente de `memory-bank/` (`product.md` para cambios funcionales del producto, `techContext.md` para cambios técnicos o de arquitectura, `progress.md` para el estado y las verificaciones). Registra solo hechos respaldados por el código o por verificaciones ejecutadas; no marques pruebas como exitosas si no se ejecutaron.
 
 ## Límites
 
