@@ -9,3 +9,54 @@
 | Los cálculos financieros implementan las reglas esperadas. | [financial-utils.ts](frontend/src/lib/financial-utils.ts), [financial-utils.test.ts](frontend/src/lib/financial-utils.test.ts) | Parcial | El código calcula beneficio como ingresos menos gastos y margen como beneficio dividido por ingresos (0 si no hay ingresos). Las pruebas cubren esas fórmulas, pero no confirman que sean las reglas requeridas por el negocio. |
 
 Las pruebas se revisaron en el código, pero no se ejecutaron.
+
+---
+
+## Verificación de especificaciones (2026-11-24)
+
+### Fase 1 — Types: `frontend/specs/api-types.ts`
+
+| Interfaz | Props verificadas contra OpenAPI | JSDoc agregado |
+|---|---|---|
+| `FacetsResponse` | ✅ `operation_types`, `business_types`, `categories`, `min_date`, `max_date` | ✅ |
+| `AlertEntry` | ✅ `period`, `outcome_total`, `baseline_average`, `increase_ratio` | ✅ |
+| `AlertsResponse` | ✅ `AlertEntry[]` | ✅ |
+| `CategoryEntry` | ✅ `category`, `operation_type`, `total_amount` | ✅ |
+| `TopCategoriesResponse` | ✅ `CategoryEntry[]` | ✅ |
+| `MetricsSummaryEntry` | ✅ `period`, `income`, `outcome`, `net` | ✅ |
+| `MetricsSummaryResponse` | ✅ `MetricsSummaryEntry[]` | ✅ |
+
+### Fase 2 — Params: `frontend/specs/param-types.ts`
+
+| Interfaz | Props verificadas contra OpenAPI | JSDoc agregado |
+|---|---|---|
+| `DateRangeFilter` | ✅ `start_date?`, `end_date?` como `string` con formato `YYYY-MM-DD` | ✅ |
+| `AlertsParams` | ✅ Extiende `DateRangeFilter`. `threshold?`, `group_by?`, `business_type?` | ✅ |
+| `TopCategoriesParams` | ✅ Extiende `DateRangeFilter`. `operation_type?`, `limit?`, `business_type?` | ✅ |
+| `FacetsParams` | ✅ `business_type?` | ✅ |
+| `MetricsSummaryParams` | ✅ Extiende `DateRangeFilter`. `group_by?`, `operation_type?`, `business_type?` | ✅ |
+
+### Fase 3 — Component specs: `frontend/specs/components.md`
+
+- ✅ `DateRangeFilterBar` — props, tipos, condicionales (rango inválido, loading, error, clear button)
+- ✅ `AlertsTable` — props, empty state, threshold validation, error states, 4 columnas
+- ✅ `BusinessComparisonPage` — props, loading state, empty top 5, chart empty state, date validation
+- ✅ `KPIRow` — props con loading skeleton
+- ✅ `IncomeOutcomeChart` — props, loading, empty data
+- ✅ `ProfitPercentChart` — props, loading, empty data
+- ✅ `DashboardHeader` — props
+- ✅ `App` — state management, navigation
+
+### Fase 4 — Data contract: `frontend/specs/README.md`
+
+| Feature | Endpoints documentados | Tipos | Parámetros | Edge cases |
+|---|---|---|---|---|
+| Date range filter | ✅ `GET /api/metrics/facets`, `GET /api/metrics` | ✅ | ✅ | ✅ 4 edge cases |
+| Anomaly alerts | ✅ `GET /api/metrics/alerts` | ✅ | ✅ | ✅ 5 edge cases |
+| B2B vs B2C | ✅ `GET /api/metrics/categories/top`, `GET /api/metrics/facets`, `GET /api/metrics/summary` | ✅ | ✅ | ✅ 5 edge cases |
+
+### Verificaciones ejecutadas
+
+- ✅ `npx tsc --noEmit`: pasa sin errores.
+- ✅ `npm test`: 8 tests pasan.
+- ✅ `npm run lint`: pasa sin errores.
