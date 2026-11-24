@@ -2,11 +2,14 @@ import { describe, expect, it } from "vitest";
 
 import {
   computeKPIs,
+  computeCategoryShares,
+  computeGroupIncome,
   computeMonthlyData,
   formatCurrency,
   formatPercent,
 } from "./financial-utils";
 import type { FinancialMovement } from "./financial-types";
+import type { CategoryEntry, MetricsSummaryEntry } from "../../specs/api-types";
 
 const sampleMovements: FinancialMovement[] = [
   {
@@ -100,6 +103,52 @@ describe("computeMonthlyData", () => {
       outcome: 0,
       profitPercent: 100,
     });
+  });
+
+  it("keeps ISO calendar dates in their stated month", () => {
+    const movements: FinancialMovement[] = [
+      {
+        create_date: "2026-03-01",
+        amount: 100,
+        operation_type: "income",
+        category: "sales",
+        business_type: "B2B",
+      },
+    ];
+
+    expect(computeMonthlyData(movements)[0].month).toBe("Mar 2026");
+  });
+});
+
+describe("business comparison calculations", () => {
+  it("calculates category shares against full group income", () => {
+    const categories: CategoryEntry[] = [
+      { category: "sales", operation_type: "income", total_amount: 60 },
+      { category: "others", operation_type: "income", total_amount: 20 },
+    ];
+    const summary: MetricsSummaryEntry[] = [
+      { period: "2026-01", income: 100, outcome: 50, net: 50 },
+      { period: "2026-02", income: 60, outcome: 20, net: 40 },
+    ];
+
+    const shares = computeCategoryShares(
+      categories,
+      ["sales", "others"],
+      computeGroupIncome(summary),
+    );
+
+    expect(shares).toEqual([
+      { category: "sales", totalAmount: 60, sharePercent: 37.5 },
+      { category: "others", totalAmount: 20, sharePercent: 12.5 },
+    ]);
+  });
+
+  it("returns zero shares when group income is zero", () => {
+    const categories: CategoryEntry[] = [
+      { category: "sales", operation_type: "income", total_amount: 0 },
+    ];
+
+    expect(computeCategoryShares(categories, ["sales"], 0)[0].sharePercent).toBe(0);
   });
 });
 
