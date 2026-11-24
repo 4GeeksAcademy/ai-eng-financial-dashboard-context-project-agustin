@@ -221,23 +221,66 @@ def detect_outcome_alerts(
     threshold: float,
 ) -> list[MetricsAlert]:
     alerts: list[MetricsAlert] = []
-    historical_outcomes: list[float] = []
-    for item in summary:
-        if historical_outcomes:
-            baseline = sum(historical_outcomes) / len(historical_outcomes)
-            if baseline > 0:
-                increase_ratio = (item.outcome - baseline) / baseline
-                if increase_ratio > threshold:
-                    alerts.append(
-                        MetricsAlert(
-                            period=item.period,
-                            outcome_total=round(item.outcome, 2),
-                            baseline_average=round(baseline, 2),
-                            increase_ratio=round(increase_ratio, 4),
-                        )
-                    )
-        historical_outcomes.append(item.outcome)
+    ordered_summary = sorted(summary, key=lambda item: item.period)
+    for index in range(3, len(ordered_summary)):
+        item = ordered_summary[index]
+        previous_outcomes = [
+            previous.outcome for previous in ordered_summary[index - 3:index]
+        ]
+        baseline = sum(previous_outcomes) / 3
+        if baseline == 0:
+            continue
+
+        increase_ratio = (item.outcome - baseline) / baseline
+        if increase_ratio > threshold:
+            alerts.append(
+                MetricsAlert(
+                    period=item.period,
+                    outcome_total=round(item.outcome, 2),
+                    baseline_average=round(baseline, 2),
+                    increase_ratio=round(increase_ratio, 4),
+                )
+            )
     return alerts
+
+
+def build_alert_summary(
+    movements: list[FinancialMovement],
+    start_date: date | None,
+    end_date: date | None,
+) -> list[MetricsSummaryItem]:
+    if not movements and (start_date is None or end_date is None):
+        return []
+
+    range_start = start_date or min(item.create_date for item in movements)
+    range_end = end_date or max(item.create_date for item in movements)
+    if range_start > range_end:
+        return []
+
+    totals_by_month = {
+        item.period: item for item in summarize_movements(movements, "month")
+    }
+    summary: list[MetricsSummaryItem] = []
+    current_month = date(range_start.year, range_start.month, 1)
+    final_month = date(range_end.year, range_end.month, 1)
+    while current_month <= final_month:
+        period = current_month.strftime("%Y-%m")
+        summary.append(
+            totals_by_month.get(
+                period,
+                MetricsSummaryItem(
+                    period=period,
+                    income=0,
+                    outcome=0,
+                    net=0,
+                ),
+            )
+        )
+        if current_month.month == 12:
+            current_month = date(current_month.year + 1, 1, 1)
+        else:
+            current_month = date(current_month.year, current_month.month + 1, 1)
+    return summary
 
 
 @router.get("/health")
@@ -260,8 +303,14 @@ def get_metrics(
 
 
 @router.get("/api/metrics/facets", response_model=MetricsFacets)
-def get_metrics_facets() -> MetricsFacets:
+def get_metrics_facets(
+    business_type: BusinessType | None = Query(default=None),
+) -> MetricsFacets:
     movements = generate_mock_movements(seed=42)
+    if business_type is not None:
+        movements = [
+            item for item in movements if item.business_type == business_type
+        ]
     return build_metrics_facets(movements)
 
 
@@ -341,7 +390,7 @@ def get_metrics_comparison(
 
 @router.get("/api/metrics/alerts", response_model=list[MetricsAlert])
 def get_metrics_alerts(
-    threshold: float = Query(default=0.3, ge=0),
+    threshold: float = Query(default=0.3, ge=0.01, le=1.0),
     group_by: GroupBy = Query(default="month"),
     start_date: date | None = Query(default=None),
     end_date: date | None = Query(default=None),
@@ -355,7 +404,10 @@ def get_metrics_alerts(
     filtered = filter_movements(
         movements, start_date, end_date, category=None, operation_type=None
     )
-    summary = summarize_movements(filtered, group_by)
+    if group_by == "month":
+        summary = build_alert_summary(filtered, start_date, end_date)
+    else:
+        summary = summarize_movements(filtered, group_by)
     return detect_outcome_alerts(summary, threshold)
 
 

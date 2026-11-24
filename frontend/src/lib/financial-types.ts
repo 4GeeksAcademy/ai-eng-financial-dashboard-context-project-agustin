@@ -23,3 +23,9 @@ export interface MonthlyDataPoint {
   outcome: number
   profitPercent: number
 }
+
+export interface CategoryShare {
+  category: Category
+  totalAmount: number
+  sharePercent: number
+}

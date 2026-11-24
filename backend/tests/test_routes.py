@@ -3,7 +3,14 @@ from datetime import date
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.routes import filter_movements_by_date, generate_mock_movements
+from app.routes import (
+    FinancialMovement,
+    MetricsSummaryItem,
+    build_alert_summary,
+    detect_outcome_alerts,
+    filter_movements_by_date,
+    generate_mock_movements,
+)
 
 
 client = TestClient(app)
@@ -116,6 +123,108 @@ def test_metrics_facets_returns_filter_options_and_date_range():
         "suppliers",
     ]
     assert payload["min_date"] <= payload["max_date"]
+
+
+def test_metrics_facets_can_filter_categories_by_business_type():
+    response = client.get("/api/metrics/facets", params={"business_type": "B2B"})
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["business_types"] == ["B2B"]
+    assert payload["categories"]
+
+
+def test_build_alert_summary_fills_empty_months_inside_selected_range():
+    movements = [
+        FinancialMovement(
+            create_date="2025-01-10",
+            amount=100,
+            operation_type="outcome",
+            category="suppliers",
+            business_type="B2B",
+        ),
+        FinancialMovement(
+            create_date="2025-03-10",
+            amount=300,
+            operation_type="outcome",
+            category="suppliers",
+            business_type="B2B",
+        ),
+    ]
+
+    summary = build_alert_summary(
+        movements, date(2025, 1, 1), date(2025, 4, 30)
+    )
+
+    assert [(item.period, item.outcome) for item in summary] == [
+        ("2025-01", 100),
+        ("2025-02", 0),
+        ("2025-03", 300),
+        ("2025-04", 0),
+    ]
+
+
+def test_detect_outcome_alerts_uses_only_previous_three_periods():
+    summary = [
+        MetricsSummaryItem(period=f"2025-{month:02}", income=0, outcome=value, net=-value)
+        for month, value in enumerate([10, 0, 20, 60, 100], start=1)
+    ]
+
+    alerts = detect_outcome_alerts(summary, threshold=0.3)
+
+    assert [alert.period for alert in alerts] == ["2025-04", "2025-05"]
+    assert alerts[0].baseline_average == 10
+    assert alerts[0].increase_ratio == 5
+    assert alerts[1].baseline_average == round((0 + 20 + 60) / 3, 2)
+
+
+def test_detect_outcome_alerts_skips_zero_baseline():
+    summary = [
+        MetricsSummaryItem(period=f"2025-{month:02}", income=0, outcome=value, net=-value)
+        for month, value in enumerate([0, 0, 0, 100], start=1)
+    ]
+
+    assert detect_outcome_alerts(summary, threshold=0.3) == []
+
+
+def test_alert_endpoint_uses_only_selected_range_and_three_month_average(monkeypatch):
+    movements = [
+        FinancialMovement(
+            create_date=movement_date,
+            amount=amount,
+            operation_type="outcome",
+            category="suppliers",
+            business_type="B2B",
+        )
+        for movement_date, amount in [
+            ("2024-12-15", 10000),
+            ("2025-01-15", 10),
+            ("2025-03-15", 20),
+            ("2025-04-15", 60),
+            ("2025-05-15", 80),
+        ]
+    ]
+    monkeypatch.setattr("app.routes.generate_mock_movements", lambda seed: movements)
+
+    response = client.get(
+        "/api/metrics/alerts",
+        params={
+            "start_date": "2025-01-01",
+            "end_date": "2025-05-31",
+            "threshold": 0.3,
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert [item["period"] for item in payload] == ["2025-04", "2025-05"]
+    assert payload[0]["baseline_average"] == 10
+    assert payload[1]["baseline_average"] == round((0 + 20 + 60) / 3, 2)
+
+
+def test_alert_endpoint_rejects_threshold_outside_configured_range():
+    assert client.get("/api/metrics/alerts", params={"threshold": 0}).status_code == 422
+    assert client.get("/api/metrics/alerts", params={"threshold": 1.01}).status_code == 422
 
 
 def test_metrics_summary_by_month_returns_balances():

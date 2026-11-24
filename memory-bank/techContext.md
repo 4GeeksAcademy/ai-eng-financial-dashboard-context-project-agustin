@@ -20,12 +20,12 @@ Direcciones locales documentadas: frontend `http://localhost:5173`, API `http://
 
 ## Comunicacion
 
-La pantalla [App.tsx](../frontend/src/App.tsx) solicita `GET /api/metrics`, recibe movimientos y calcula los KPI y datos mensuales en el frontend. El backend genera 360 movimientos simulados por solicitud, ordenados por fecha; usa semilla `42`, pero asigna los años respecto a `date.today()`. No considerar estos datos como transacciones persistentes.
+La pantalla [App.tsx](../frontend/src/App.tsx) carga facetas y movimientos; deriva KPI y series mensuales en frontend. El filtro opcional `start_date`/`end_date` se envía a movimientos y alertas. [BusinessComparisonPage](../frontend/src/components/dashboard/business-comparison-page.tsx) consulta facetas por negocio, top categorías y resumen mensual para calcular participaciones respecto al ingreso total del grupo. El backend genera 360 movimientos simulados por solicitud, ordenados por fecha; usa semilla `42`, pero asigna los años respecto a `date.today()`.
 
 [Vite](../frontend/vite.config.ts) escucha en `0.0.0.0:5173` y reenvia `/api` a `http://172.18.0.1:8000` con `changeOrigin`. El archivo contiene un comentario indicando que se cambio el destino porque el anterior no cargaba el frontend. No sustituir este destino sin probar la conectividad desde el entorno previsto. Compose usa `depends_on` para ordenar el inicio, pero no declara una comprobacion de disponibilidad del backend.
 
-La ruta consumida por la pantalla principal es `/api/metrics`. El backend implementa ademas rutas analiticas, pero no asumir que la interfaz las consume.
+`GET /api/metrics/facets` expone `min_date`/`max_date` y acepta `business_type` opcional para las categorías disponibles de cada grupo. `GET /api/metrics/alerts` limita `threshold` a `0.01..1.0`; para alertas mensuales completa huecos del rango con outcomes cero y compara con la media de los tres meses previos. No incluye historial fuera del rango.
 
 ## Verificacion
 
-Los scripts y pruebas descritos arriba estan declarados en el proyecto; su presencia no implica que se hayan ejecutado. Para validar una integracion, comprobar la interfaz en `:5173`, `/health`, `/docs` y una solicitud del frontend a `/api/metrics`.
+Las pruebas frontend/backend, lint y build se ejecutan con los comandos listados arriba; para validar integración comprobar `:5173`, `/health`, `/docs` y las rutas analíticas a través del proxy Vite. El proxy actual fue probado desde el contenedor frontend.
